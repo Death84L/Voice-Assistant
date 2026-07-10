@@ -1,9 +1,9 @@
 # Voice Pipeline — English → Arabic (Go)
 
-Real ASR → Translation → TTS pipeline. Not pseudocode — this hits real APIs
+Real ASR → Translation → TTS pipeline. This hits real APIs
 and returns playable Arabic audio.
 
-## 1. What you need to install
+## 1. What we need to install
 
 | Requirement | Why |
 |---|---|
@@ -12,7 +12,7 @@ and returns playable Arabic audio.
 | **curl** or **Postman** | to send a test audio file to the server |
 | Any audio player | to play the returned `arabic_output.mp3` |
 
-You do **not** need ffmpeg. Groq's API accepts `wav`, `mp3`, `m4a` directly.
+We do **not** need ffmpeg. Groq's API accepts `wav`, `mp3`, `m4a` directly.
 
 ```bash
 export GROQ_API_KEY="gsk-...your-key..."
@@ -20,9 +20,9 @@ export GROQ_API_KEY="gsk-...your-key..."
 
 ## 2. Get a sample English voice input
 
-You need one short English audio file to test with. Easiest options:
+We need one short English audio file to test with. Easiest options:
 
-- **Record it yourself**: any phone voice-memo app, say "Can we move the
+- **Record it **: any phone voice-memo app, say "Can we move the
   meeting to 5 PM tomorrow?", export as `sample.wav` or `sample.m4a`.
 - **Or generate one**: use any free online text-to-speech tool, type the
   sentence above, download the audio, name it `sample.wav`.
@@ -37,13 +37,13 @@ go mod tidy       # fetches github.com/google/uuid
 go run cmd/main.go
 ```
 
-You should see structured JSON logs like:
+We should see structured JSON logs like:
 
 ```json
 {"time":"...","level":"INFO","msg":"startup.server_started","addr":":8080"}
 ```
 
-## 4. Send your sample audio
+## 4. Send sample audio
 
 ```bash
 curl -X POST http://localhost:8080/translate \
@@ -53,7 +53,7 @@ curl -X POST http://localhost:8080/translate \
 
 Play `arabic_output.mp3` — that's the Arabic voice output.
 
-While it runs, your terminal will show production-style logs for every stage:
+While it runs, terminal will show production-style logs for every stage:
 
 ```json
 {"level":"INFO","msg":"http.request_received","session_id":"...","filename":"sample.wav","size_bytes":48210}
@@ -67,9 +67,8 @@ While it runs, your terminal will show production-style logs for every stage:
 {"level":"INFO","msg":"pipeline.complete","session_id":"...","duration_ms":2140}
 ```
 
-Every stage is logged separately with the session ID, so you can point to
-exactly where a failure happened — this is what "production-style logging"
-means in practice, not just `fmt.Println`.
+Every stage is logged separately with the session ID, so can point to
+exactly where a failure happened 
 
 ## 5. Run the tests
 
@@ -85,7 +84,7 @@ is fully testable without touching a network.
 ## 6. Is this "real-time"?
 
 Honest answer: this is **near-real-time, per-utterance**, not continuous
-streaming. You send one complete audio file, get one complete Hindi audio
+streaming. We send one complete audio file, get one complete audio
 file back — round trip is typically 2–4 seconds depending on sentence
 length and network latency to OpenAI.
 
