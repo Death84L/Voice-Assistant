@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Real-time Translate — WS test client</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 40px auto; }
+    button { font-size: 16px; padding: 10px 20px; margin-right: 10px; }
+    #log { white-space: pre-wrap; font-family: monospace; font-size: 13px;
+           background: #111; color: #0f0; padding: 12px; height: 260px;
+           overflow-y: auto; margin-top: 16px; }
+    #status { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>Real-time Translate — test client</h2>
+  <p>WS endpoint: <code id="wsUrlDisplay"></code></p>
+  <button id="startBtn">Start</button>
+  <button id="stopBtn" disabled>Stop</button>
+  <p>Status: <span id="status">idle</span></p>
+  <div id="log"></div>
+
+  <script>
+    const WS_URL = "ws://localhost:8080/translate/stream";
+    const CHUNK_MS = 3000; // length of each self-contained recording burst
+
+    document.getElementById("wsUrlDisplay").textContent = WS_URL;
+
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const statusEl = document.getElementById("status");
+    const logEl = document.getElementById("log");
+
+    function log(msg) {
+      const t = new Date().toLocaleTimeString();
+      logEl.textContent += `[${t}] ${msg}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    let ws = null;
+    let stream = null;
+    let running = false;
+    let mimeType = "audio/webm";
+
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+      mimeType = "audio/ogg"; // Firefox fallback
+    }
+
+    async function start() {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      ws = new WebSocket(WS_URL);
+      ws.binaryType = "arraybuffer";
+
+      ws.onopen = () => {
+        statusEl.textContent = "connected";
+        log("WebSocket connected");
+        running = true;
+        recordLoop();
+      };
+
+      ws.onmessage = (event) => {
+        log(`Received translated audio (${event.data.byteLength} bytes) — playing`);
+        const blob = new Blob([event.data], { type: "audio/mpeg" });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.play();
+      };
+
+      ws.onerror = (e) => log("WebSocket error: " + e.message);
+      ws.onclose = () => {
+        statusEl.textContent = "closed";
+        log("WebSocket closed");
+        running = false;
+      };
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    }
+
+    // Repeatedly records a fresh, fully self-contained CHUNK_MS clip and
+    // sends it, rather than slicing one continuous MediaRecorder stream -
+    // each burst is a complete, independently decodable audio file.
+    function recordLoop() {
+      if (!running) return;
+
+      const recorder = new MediaRecorder(stream, { mimeType });
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        const buf = await blob.arrayBuffer();
+        if (ws.readyState === WebSocket.OPEN && buf.byteLength > 0) {
+          ws.send(buf);
+          log(`Sent chunk (${buf.byteLength} bytes)`);
+        }
+        recordLoop(); // start the next burst
+      };
+
+      recorder.start();
+      setTimeout(() => {
+        if (recorder.state !== "inactive") recorder.stop();
+      }, CHUNK_MS);
+    }
+
+    function stop() {
+      running = false;
+      if (ws) ws.close();
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      statusEl.textContent = "idle";
+    }
+
+    startBtn.onclick = start;
+    stopBtn.onclick = stop;
+  </script>
+</body>
+</html>
